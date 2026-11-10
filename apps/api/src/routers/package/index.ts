@@ -30,7 +30,7 @@ export const packageRouter = $.createApp()
 			const { packageName } = c.req.valid("param");
 			const can = assertTokenAccess(c.get("token"));
 
-			const publishedPackage = await packageService.getPackage(packageName);
+			const publishedPackage = await packageService.getPackage(packageName, new URL(c.req.url).origin);
 
 			if (!publishedPackage) {
 				if (env.FALLBACK_REGISTRY_ENDPOINT) {
