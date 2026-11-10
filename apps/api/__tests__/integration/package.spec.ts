@@ -464,7 +464,17 @@ describe("package routes", () => {
 			expect(responseBody).to.have.property("name").to.be.a("string").to.equal(packagePublishPayload.name);
 			expect(responseBody).to.have.property("_id").to.be.a("string").to.equal(packagePublishPayload._id);
 			expect(responseBody).to.have.property("dist-tags").to.be.deep.equal(packagePublishPayload["dist-tags"]);
-			expect(responseBody).to.have.property("versions").to.be.deep.equal(packagePublishPayload.versions);
+			expect(responseBody)
+				.to.have.property("versions")
+				.to.be.deep.equal({
+					"1.0.0": {
+						...packagePublishPayload.versions["1.0.0"],
+						dist: {
+							...packagePublishPayload.versions["1.0.0"].dist,
+							tarball: "http://localhost/mock/-/mock-1.0.0.tgz"
+						}
+					}
+				});
 		});
 
 		it("should get a package that does not belong to the local registry and fallback to the fallback registry", async () => {

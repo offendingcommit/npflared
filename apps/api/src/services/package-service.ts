@@ -3,12 +3,14 @@ import { sql } from "drizzle-orm";
 import type { z } from "zod";
 import { db } from "#db/index";
 import { packageReleaseTable, packageTable } from "#db/schema";
-import type { validators } from "#routers/package/validators";
+import { validators } from "#routers/package/validators";
 import { base64ToReadableStream } from "#utils/common";
 import { HttpError } from "#utils/http";
 
+const getAttachmentName = (packageName: string, version: string) => `${packageName}-${version}.tgz`;
+
 export const packageService = {
-	async getPackage(packageName: string) {
+	async getPackage(packageName: string, registryOrigin: string) {
 		const publishedPackage = await db.query.packageTable.findFirst({
 			with: { packageReleases: true },
 			where: (table, { eq }) => eq(table.name, packageName)
@@ -18,9 +20,17 @@ export const packageService = {
 			return undefined;
 		}
 
+		const releaseSchema = validators.put.request.json.shape.versions.valueType;
+		const manifestSchema = releaseSchema.pick({ dist: true }).extend({ dist: releaseSchema.shape.dist.loose() });
 		const versions = publishedPackage.packageReleases.reduce(
 			(versions, { version, manifest }) => {
-				versions[version] = manifest;
+				const parsedManifest = manifestSchema.parse(manifest);
+				const tarballURL = new URL(registryOrigin);
+				tarballURL.pathname = `/${packageName}/-/${getAttachmentName(packageName, version)}`;
+				versions[version] = {
+					...parsedManifest,
+					dist: { ...parsedManifest.dist, tarball: tarballURL.href }
+				};
 				return versions;
 			},
 			{} as Record<string, unknown>
@@ -69,7 +79,7 @@ export const packageService = {
 			throw HttpError.badRequest("No attachment");
 		}
 
-		const expectedAttachmentName = `${packageName}-${versionToUpload}.tgz`;
+		const expectedAttachmentName = getAttachmentName(packageName, versionToUpload);
 
 		if (attachmentName !== expectedAttachmentName) {
 			throw HttpError.badRequest("Attachment name does not match");
